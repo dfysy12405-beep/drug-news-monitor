@@ -251,34 +251,40 @@ if view_mode == "🗂️ 유사 기사 묶어서 보기":
             kw_str = "  ".join([f"#{k}" for k in grp["top_keywords"][:4]])
 
             with st.expander(
-                f"📎 관련 기사 {len(related)}건 펼치기 &nbsp;|&nbsp; "
-                f"언론사: {sources_str} &nbsp;|&nbsp; {kw_str}",
+                f"📎 관련 기사 {len(related)}건 펼치기  |  언론사: {sources_str}  |  {kw_str}",
                 expanded=False,
             ):
                 for rel in related:
-                    url  = rel.get("url", "")
+                    url   = rel.get("url", "")
                     title = rel.get("title", "")
                     src   = rel.get("source", "")
                     pub   = rel.get("published_date", "")
+                    imp   = rel.get("importance", "보통")
+                    cat   = rel.get("category", "")
+                    imp_icon = "🟢" if imp == "높음" else ("🟡" if imp == "보통" else "⚪")
 
-                    # 관련 기사 제목 클릭 → 원문 링크
                     if url and url.startswith("http"):
                         title_html = (
                             f'<a href="{url}" target="_blank" '
-                            f'style="color:#0f172a;text-decoration:none;font-size:0.92rem;" '
-                            f'onmouseover="this.style.color='#0d9488'" '
-                            f'onmouseout="this.style.color='#0f172a'">'
-                            f'🔗 {title}</a>'
+                            f'style="color:#0f172a;text-decoration:none;'
+                            f'font-size:0.95rem;font-weight:600;line-height:1.4;" '
+                            f'onmouseover="this.style.color='#0d9488';this.style.textDecoration='underline'" '
+                            f'onmouseout="this.style.color='#0f172a';this.style.textDecoration='none'">'
+                            f'{title} 🔗</a>'
                         )
                     else:
-                        title_html = f'<span style="font-size:0.92rem;">{title}</span>'
+                        title_html = (
+                            f'<span style="font-size:0.95rem;font-weight:600;color:#0f172a;">'
+                            f'{title}</span>'
+                        )
 
                     st.markdown(
-                        f'<div style="padding:8px 12px;border-left:3px solid #e2e8f0;'
-                        f'margin-bottom:6px;">'
-                        f'{title_html}'
-                        f'<div style="font-size:0.75rem;color:#94a3b8;margin-top:3px;">'
-                        f'📰 {src} &nbsp;|&nbsp; {pub}</div>'
+                        f'<div style="background:#f8fafc;border-left:3px solid #0d9488;'
+                        f'border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:10px;">'
+                        f'<div style="margin-bottom:6px;">{imp_icon} {title_html}</div>'
+                        f'<div style="font-size:0.78rem;color:#64748b;">'
+                        f'📰 <b>{src}</b> &nbsp;|&nbsp; 발행 {pub} &nbsp;|&nbsp; {cat}'
+                        f'</div>'
                         f'</div>',
                         unsafe_allow_html=True,
                     )

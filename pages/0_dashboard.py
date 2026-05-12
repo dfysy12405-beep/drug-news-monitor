@@ -237,13 +237,65 @@ else:
     articles = db.get_articles(order_by=order_by)
     section_title = "📰 전체 수집 기사"
 
-title_col, sort_info_col = st.columns([4, 2])
-title_col.markdown(f"#### {section_title} &nbsp; <span style='font-size:0.9rem;color:#64748b;font-weight:400;'>({len(articles)}건)</span>", unsafe_allow_html=True)
-sort_info_col.markdown(f"<div style='text-align:right;padding-top:8px;color:#64748b;font-size:0.85rem;'>🔃 {sort_label}</div>", unsafe_allow_html=True)
+# 유사기사 묶기 토글
+t1, t2, t3 = st.columns([4, 2, 2])
+t1.markdown(f"#### {section_title} &nbsp; <span style='font-size:0.9rem;color:#64748b;font-weight:400;'>({len(articles)}건)</span>", unsafe_allow_html=True)
+t2.markdown(f"<div style='text-align:right;padding-top:8px;color:#64748b;font-size:0.85rem;'>🔃 {sort_label}</div>", unsafe_allow_html=True)
+group_mode = t3.toggle("🗂️ 유사 기사 묶기", value=False, key="dash_group_toggle")
 
 if articles.empty:
     st.info("해당 조건의 기사가 없습니다.")
+elif group_mode:
+    # ── 유사 기사 묶어서 보기 ──
+    @st.cache_data(show_spinner="유사 기사 그룹화 중...", ttl=120)
+    def _dash_groups(df_json):
+        import pandas as pd, io
+        _df = pd.read_json(io.StringIO(df_json))
+        return get_grouped_articles(_df, threshold=80.0, date_window=3)
+
+    groups = _dash_groups(articles.to_json())
+    dup_cnt = sum(g["count"] - 1 for g in groups if g["count"] > 1)
+    st.caption(f"🗂️ {len(groups)}개 그룹으로 표시 중 (중복 {dup_cnt}건 숨김)")
+
+    for grp in groups:
+        rep   = grp["representative"]
+        count = grp["count"]
+        render_article_card(rep)
+
+        if count > 1:
+            related = grp["articles"][1:]
+            sources_str = " · ".join(grp["sources"][:3])
+            with st.expander(f"📎 관련 기사 {len(related)}건 펼치기 &nbsp;|&nbsp; {sources_str}", expanded=False):
+                for rel in related:
+                    url   = rel.get("url", "")
+                    title = rel.get("title", "")
+                    src   = rel.get("source", "")
+                    pub   = rel.get("published_date", "")
+                    imp   = rel.get("importance", "보통")
+                    imp_icon = "🟢" if imp == "높음" else ("🟡" if imp == "보통" else "⚪")
+
+                    if url and url.startswith("http"):
+                        title_html = (
+                            f'<a href="{url}" target="_blank" '
+                            f'style="color:#0f172a;text-decoration:none;font-size:0.93rem;font-weight:500;" '
+                            f'onmouseover="this.style.color='#0d9488'" '
+                            f'onmouseout="this.style.color='#0f172a'">'
+                            f'{imp_icon} {title} 🔗</a>'
+                        )
+                    else:
+                        title_html = f'<span style="font-size:0.93rem;font-weight:500;">{imp_icon} {title}</span>'
+
+                    st.markdown(
+                        f'<div style="background:#f8fafc;border-left:3px solid #cbd5e1;'
+                        f'border-radius:0 6px 6px 0;padding:10px 14px;margin-bottom:8px;">'
+                        f'{title_html}'
+                        f'<div style="font-size:0.76rem;color:#94a3b8;margin-top:4px;">'
+                        f'📰 {src} &nbsp;|&nbsp; {pub}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
 else:
+    # ── 개별 기사 보기 (기존) ──
     for _, row in articles.iterrows():
         render_article_card(row)
 
