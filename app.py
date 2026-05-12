@@ -86,53 +86,39 @@ today_articles = db.get_today_article_count()
 high_articles = db.get_articles(importance="높음").shape[0]
 active_keywords = db.get_keywords(active_only=True).shape[0]
 
-st.markdown("##### 📌 클릭하면 해당 기사만 표시됩니다")
+st.markdown("##### 📌 버튼을 클릭하면 해당 기사만 표시됩니다")
+st.markdown("""
+<style>
+section[data-testid="stMain"] div[data-testid="stButton"] > button {
+    height: 85px; white-space: pre-line; line-height: 1.7; font-size: 1rem; font-weight: 600;
+}
+</style>""", unsafe_allow_html=True)
+
 c1, c2, c3, c4 = st.columns(4)
 
 with c1:
     active = st.session_state["dash_filter"] == "all"
-    bg = "#f0fdfa" if active else "white"
-    border = "2px solid #0d9488" if active else "1px solid #e2e8f0"
-    st.markdown(
-        f'<div style="background:{bg};border:{border};border-radius:8px;'
-        f'padding:14px;text-align:center;margin-bottom:4px;">'
-        f'<div style="font-size:0.8rem;color:#64748b;">📚 전체 수집 기사</div>'
-        f'<div style="font-size:1.8rem;font-weight:700;color:#2563eb;">{total_articles:,}건</div>'
-        f'</div>', unsafe_allow_html=True
-    )
-    if st.button("전체 보기", key="btn_all"):
+    label = "📚 전체 수집 기사\n" + f"{total_articles:,}건"
+    if st.button(label, key="btn_all", use_container_width=True,
+                 type="primary" if active else "secondary"):
         st.session_state["dash_filter"] = "all"
         st.session_state["dash_keyword"] = None
         st.rerun()
 
 with c2:
     active = st.session_state["dash_filter"] == "today"
-    bg = "#f0fdfa" if active else "white"
-    border = "2px solid #0d9488" if active else "1px solid #e2e8f0"
-    st.markdown(
-        f'<div style="background:{bg};border:{border};border-radius:8px;'
-        f'padding:14px;text-align:center;margin-bottom:4px;">'
-        f'<div style="font-size:0.8rem;color:#64748b;">📅 오늘 수집 기사</div>'
-        f'<div style="font-size:1.8rem;font-weight:700;color:#10b981;">{today_articles:,}건</div>'
-        f'</div>', unsafe_allow_html=True
-    )
-    if st.button("오늘 기사 보기", key="btn_today"):
+    label = "📅 오늘 수집 기사\n" + f"{today_articles:,}건"
+    if st.button(label, key="btn_today", use_container_width=True,
+                 type="primary" if active else "secondary"):
         st.session_state["dash_filter"] = "today"
         st.session_state["dash_keyword"] = None
         st.rerun()
 
 with c3:
     active = st.session_state["dash_filter"] == "high"
-    bg = "#f0fdfa" if active else "white"
-    border = "2px solid #0d9488" if active else "1px solid #e2e8f0"
-    st.markdown(
-        f'<div style="background:{bg};border:{border};border-radius:8px;'
-        f'padding:14px;text-align:center;margin-bottom:4px;">'
-        f'<div style="font-size:0.8rem;color:#64748b;">🟢 중요 기사 (높음)</div>'
-        f'<div style="font-size:1.8rem;font-weight:700;color:#0d9488;">{high_articles:,}건</div>'
-        f'</div>', unsafe_allow_html=True
-    )
-    if st.button("중요 기사 보기", key="btn_high"):
+    label = "🟢 중요 기사 (높음)\n" + f"{high_articles:,}건"
+    if st.button(label, key="btn_high", use_container_width=True,
+                 type="primary" if active else "secondary"):
         st.session_state["dash_filter"] = "high"
         st.session_state["dash_keyword"] = None
         st.rerun()
@@ -140,9 +126,9 @@ with c3:
 with c4:
     st.markdown(
         f'<div style="background:white;border:1px solid #e2e8f0;border-radius:8px;'
-        f'padding:14px;text-align:center;margin-bottom:4px;">'
-        f'<div style="font-size:0.8rem;color:#64748b;">🏷️ 활성 키워드</div>'
-        f'<div style="font-size:1.8rem;font-weight:700;color:#8b5cf6;">{active_keywords}개</div>'
+        f'height:85px;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
+        f'<div style="font-size:0.85rem;color:#64748b;">🏷️ 활성 키워드</div>'
+        f'<div style="font-size:1.8rem;font-weight:700;color:#8b5cf6;margin-top:4px;">{active_keywords}개</div>'
         f'</div>', unsafe_allow_html=True
     )
 
