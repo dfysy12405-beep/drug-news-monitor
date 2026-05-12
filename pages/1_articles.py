@@ -138,10 +138,11 @@ with st.container():
     search = c1.text_input("🔍 제목·요약·키워드 검색", placeholder="검색어 입력")
     sort_options = {
         "최신순 (수집일)": "collected_date DESC, id DESC",
-        "발행일순": "published_date DESC, id DESC",
-        "중요도순": "CASE importance WHEN '높음' THEN 0 WHEN '보통' THEN 1 ELSE 2 END, collected_date DESC",
+        "최신순 (발행일)": "published_date DESC, id DESC",
+        "중요도순":        "CASE importance WHEN '높음' THEN 0 WHEN '보통' THEN 1 ELSE 2 END, collected_date DESC",
+        "오래된순":        "collected_date ASC, id ASC",
     }
-    sort_label = c2.selectbox("정렬", list(sort_options.keys()))
+    sort_label = c2.selectbox("🔃 정렬", list(sort_options.keys()))
     today_only = c3.checkbox("오늘 수집만", value=False)
 
     # 둘째 줄: 카테고리 / 중요도 / 기간

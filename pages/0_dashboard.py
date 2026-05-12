@@ -159,20 +159,33 @@ today_str = datetime.now().strftime("%Y-%m-%d")
 dash_filter = st.session_state["dash_filter"]
 dash_keyword = st.session_state["dash_keyword"]
 
+# 정렬 옵션
+sort_options = {
+    "최신순 (수집일)":  "collected_date DESC, id DESC",
+    "최신순 (발행일)":  "published_date DESC, id DESC",
+    "중요도순":         "CASE importance WHEN '높음' THEN 0 WHEN '보통' THEN 1 ELSE 2 END, collected_date DESC",
+    "오래된순":         "collected_date ASC, id ASC",
+}
+sort_col, _ = st.columns([2, 5])
+sort_label = sort_col.selectbox("🔃 정렬", list(sort_options.keys()), label_visibility="collapsed")
+order_by = sort_options[sort_label]
+
 if dash_filter == "today":
-    articles = db.get_articles(start_date=today_str, end_date=today_str)
+    articles = db.get_articles(start_date=today_str, end_date=today_str, order_by=order_by)
     section_title = f"📅 오늘 수집 기사 ({today_str})"
 elif dash_filter == "high":
-    articles = db.get_articles(importance="높음")
+    articles = db.get_articles(importance="높음", order_by=order_by)
     section_title = "🟢 중요도 높음 기사"
 elif dash_filter == "keyword" and dash_keyword:
-    articles = db.get_articles(keyword=dash_keyword)
+    articles = db.get_articles(keyword=dash_keyword, order_by=order_by)
     section_title = f"🏷️ #{dash_keyword} 관련 기사"
 else:
-    articles = db.get_articles()
+    articles = db.get_articles(order_by=order_by)
     section_title = "📰 전체 수집 기사"
 
-st.markdown(f"#### {section_title} &nbsp; <span style='font-size:0.9rem;color:#64748b;font-weight:400;'>({len(articles)}건)</span>", unsafe_allow_html=True)
+title_col, sort_info_col = st.columns([4, 2])
+title_col.markdown(f"#### {section_title} &nbsp; <span style='font-size:0.9rem;color:#64748b;font-weight:400;'>({len(articles)}건)</span>", unsafe_allow_html=True)
+sort_info_col.markdown(f"<div style='text-align:right;padding-top:8px;color:#64748b;font-size:0.85rem;'>🔃 {sort_label}</div>", unsafe_allow_html=True)
 
 if articles.empty:
     st.info("해당 조건의 기사가 없습니다.")
