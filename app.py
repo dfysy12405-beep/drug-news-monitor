@@ -154,23 +154,15 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("#### 🏷️ 키워드별 보기 — 클릭하면 해당 기사만 표시")
 top_kws = analyzer.get_top_keywords(top_n=12)
 if top_kws:
-    kw_cols = st.columns(len(top_kws))
+    kw_cols = st.columns(min(len(top_kws), 12))
     for i, (kw, cnt) in enumerate(top_kws):
         with kw_cols[i]:
             is_active = (st.session_state["dash_filter"] == "keyword"
                          and st.session_state["dash_keyword"] == kw)
-            bg = "#0d9488" if is_active else "#eef2ff"
-            color = "white" if is_active else "#3730a3"
-            st.markdown(
-                f'<div style="background:{bg};color:{color};text-align:center;'
-                f'padding:6px 4px;border-radius:16px;font-size:0.78rem;'
-                f'font-weight:500;margin-bottom:4px;">'
-                f'#{kw}<br><span style="font-size:0.72rem;opacity:0.8;">{cnt}건</span></div>',
-                unsafe_allow_html=True
-            )
-            if st.button(kw, key=f"kw_{kw}", label_visibility="collapsed"):
+            # 활성화된 키워드는 라벨에 ✅ 표시
+            label = f"✅ #{kw}\n{cnt}건" if is_active else f"#{kw}\n{cnt}건"
+            if st.button(label, key=f"kw_{kw}", use_container_width=True):
                 if is_active:
-                    # 다시 누르면 해제
                     st.session_state["dash_filter"] = "all"
                     st.session_state["dash_keyword"] = None
                 else:
