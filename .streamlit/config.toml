@@ -8,3 +8,7 @@ font = "sans serif"
 
 [server]
 headless = true
+
+[browser]
+# 브라우저 탭 제목 및 홈 화면 추가 시 앱 이름
+serverName = "마약류 언론동향 모니터링"

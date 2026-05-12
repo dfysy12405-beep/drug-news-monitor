@@ -9,9 +9,19 @@
 
 import streamlit as st
 
+from PIL import Image
+import os
+
+# 아이콘 파일 로드
+_icon_path = os.path.join(os.path.dirname(__file__), "assets", "icon.png")
+try:
+    _icon = Image.open(_icon_path)
+except Exception:
+    _icon = "📰"
+
 st.set_page_config(
     page_title="마약류 언론동향 모니터링 시스템",
-    page_icon="📰",
+    page_icon=_icon,
     layout="wide",
     initial_sidebar_state="expanded",
 )
