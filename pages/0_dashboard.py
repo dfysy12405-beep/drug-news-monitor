@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from modules import database as db
 from modules import analyzer
 from modules.utils import page_header, render_article_card, badge_category
+from modules.similarity import get_grouped_articles
 
 
 st.markdown("""
@@ -146,6 +147,38 @@ with c4:
         f'<div style="font-size:1.8rem;font-weight:700;color:#8b5cf6;margin-top:4px;">{active_keywords}개</div>'
         f'</div>', unsafe_allow_html=True
     )
+
+# 유사기사 그룹화 통계 소형 KPI
+try:
+    @st.cache_data(show_spinner=False, ttl=300)
+    def _dash_group_stats(df_json):
+        import pandas as pd, io
+        _df = pd.read_json(io.StringIO(df_json))
+        gs = get_grouped_articles(_df, threshold=80.0, date_window=3)
+        return (
+            sum(1 for g in gs if g["count"] > 1),
+            sum(g["count"] - 1 for g in gs if g["count"] > 1),
+        )
+    _all_df = db.get_articles()
+    if not _all_df.empty:
+        _grouped_cnt, _dup_cnt = _dash_group_stats(_all_df.to_json())
+        g1, g2 = st.columns(2)
+        g1.markdown(
+            f'<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;'
+            f'padding:8px;text-align:center;margin-top:8px;">'
+            f'<div style="font-size:0.72rem;color:#0f766e;">🗂️ 유사 묶음 그룹</div>'
+            f'<div style="font-size:1.2rem;font-weight:700;color:#0d9488;">{_grouped_cnt}건</div>'
+            f'</div>', unsafe_allow_html=True
+        )
+        g2.markdown(
+            f'<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;'
+            f'padding:8px;text-align:center;margin-top:8px;">'
+            f'<div style="font-size:0.72rem;color:#0f766e;">📎 중복 기사</div>'
+            f'<div style="font-size:1.2rem;font-weight:700;color:#0d9488;">{_dup_cnt}건</div>'
+            f'</div>', unsafe_allow_html=True
+        )
+except Exception:
+    pass
 
 st.markdown("<br>", unsafe_allow_html=True)
 

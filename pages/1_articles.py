@@ -13,6 +13,7 @@ from modules.utils import (
     page_header, render_article_card, badge_importance,
     badge_category, keyword_tags, CATEGORY_LIST,
 )
+from modules.similarity import get_grouped_articles
 
 
 db.init_db()
@@ -181,12 +182,12 @@ df = db.get_articles(
     order_by=sort_options[sort_label],
 )
 
-st.markdown(f"##### 📋 조회 결과: **{len(df)}건**")
-
-# CSV 다운로드 버튼
+# 조회 결과 헤더 + CSV
+rc1, rc2 = st.columns([4, 2])
+rc1.markdown(f"##### 📋 조회 결과: **{len(df)}건**")
 if not df.empty:
     csv = df.to_csv(index=False).encode("utf-8-sig")
-    st.download_button(
+    rc2.download_button(
         "📥 CSV 다운로드", data=csv,
         file_name=f"articles_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
         mime="text/csv",
@@ -197,24 +198,110 @@ if df.empty:
     st.stop()
 
 # ============================================================
-# 표시 모드 선택 (카드 / 표)
+# 표시 모드 선택 (카드 / 표 / 유사기사 묶기)
 # ============================================================
-view_mode = st.radio("표시 형식", ["📇 카드형", "📊 표형식"], horizontal=True, label_visibility="collapsed")
+view_mode = st.radio(
+    "표시 형식",
+    ["📇 개별 기사로 보기", "🗂️ 유사 기사 묶어서 보기", "📊 표형식"],
+    horizontal=True,
+    label_visibility="collapsed",
+)
 
-if view_mode == "📊 표형식":
+# ──────────────────────────────────────
+# (A) 유사 기사 묶어서 보기
+# ──────────────────────────────────────
+if view_mode == "🗂️ 유사 기사 묶어서 보기":
+
+    # 유사도 설정 슬라이더
+    with st.expander("⚙️ 그룹화 설정", expanded=False):
+        col_s1, col_s2 = st.columns(2)
+        threshold  = col_s1.slider("제목 유사도 기준 (%)", 60, 95, 80, 5)
+        date_window = col_s2.slider("발행일 차이 기준 (일)", 1, 7, 3)
+
+    # 캐시용 해시키 (DataFrame → json 문자열 기반)
+    @st.cache_data(show_spinner="유사 기사 그룹화 중...")
+    def _cached_group(df_json: str, thr: float, dw: int):
+        import pandas as pd, io
+        _df = pd.read_json(io.StringIO(df_json))
+        return get_grouped_articles(_df, thr, dw)
+
+    groups = _cached_group(df.to_json(), float(threshold), int(date_window))
+
+    grouped_cnt  = sum(1 for g in groups if g["count"] > 1)
+    duplicate_cnt = sum(g["count"] - 1 for g in groups if g["count"] > 1)
+
+    st.markdown(
+        f"🗂️ **{len(groups)}개 그룹** &nbsp;|&nbsp; "
+        f"유사 묶음 **{grouped_cnt}건** &nbsp;|&nbsp; "
+        f"중복 기사 **{duplicate_cnt}건** 숨김"
+    )
+    st.divider()
+
+    for idx, grp in enumerate(groups):
+        rep   = grp["representative"]
+        count = grp["count"]
+
+        # 대표 기사 카드
+        render_article_card(rep)
+
+        # 관련 기사가 2건 이상이면 펼치기 버튼
+        if count > 1:
+            related = grp["articles"][1:]  # 대표 제외 나머지
+            sources_str = " · ".join(grp["sources"][:4])
+            kw_str = "  ".join([f"#{k}" for k in grp["top_keywords"][:4]])
+
+            with st.expander(
+                f"📎 관련 기사 {len(related)}건 펼치기 &nbsp;|&nbsp; "
+                f"언론사: {sources_str} &nbsp;|&nbsp; {kw_str}",
+                expanded=False,
+            ):
+                for rel in related:
+                    url  = rel.get("url", "")
+                    title = rel.get("title", "")
+                    src   = rel.get("source", "")
+                    pub   = rel.get("published_date", "")
+
+                    # 관련 기사 제목 클릭 → 원문 링크
+                    if url and url.startswith("http"):
+                        title_html = (
+                            f'<a href="{url}" target="_blank" '
+                            f'style="color:#0f172a;text-decoration:none;font-size:0.92rem;" '
+                            f'onmouseover="this.style.color='#0d9488'" '
+                            f'onmouseout="this.style.color='#0f172a'">'
+                            f'🔗 {title}</a>'
+                        )
+                    else:
+                        title_html = f'<span style="font-size:0.92rem;">{title}</span>'
+
+                    st.markdown(
+                        f'<div style="padding:8px 12px;border-left:3px solid #e2e8f0;'
+                        f'margin-bottom:6px;">'
+                        f'{title_html}'
+                        f'<div style="font-size:0.75rem;color:#94a3b8;margin-top:3px;">'
+                        f'📰 {src} &nbsp;|&nbsp; {pub}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+        st.markdown("")  # 간격
+
+# ──────────────────────────────────────
+# (B) 표형식
+# ──────────────────────────────────────
+elif view_mode == "📊 표형식":
     show_df = df[["id", "collected_date", "published_date", "source", "title",
                   "category", "importance", "keywords"]].copy()
     show_df.columns = ["ID", "수집일", "발행일", "언론사", "제목", "분류", "중요도", "키워드"]
     st.dataframe(show_df, use_container_width=True, hide_index=True, height=600)
-
-    # 상세보기 안내
     st.caption("💡 아래에서 ID 번호를 입력하면 상세 화면으로 이동합니다.")
     sel_id = st.number_input("기사 ID", min_value=1, value=int(df.iloc[0]["id"]), step=1)
     if st.button("👁️ 상세 보기"):
         st.query_params["id"] = str(int(sel_id))
         st.rerun()
+
+# ──────────────────────────────────────
+# (C) 개별 기사 카드형 (기존)
+# ──────────────────────────────────────
 else:
-    # 카드형 - 페이지네이션
     PAGE_SIZE = 15
     total_pages = (len(df) - 1) // PAGE_SIZE + 1
     page = st.number_input(f"페이지 (총 {total_pages}쪽)", min_value=1, max_value=total_pages, value=1)
@@ -222,7 +309,6 @@ else:
     sliced = df.iloc[start:start + PAGE_SIZE]
 
     for _, row in sliced.iterrows():
-        # 카드 + 상세보기 버튼
         col_card, col_btn = st.columns([6, 1])
         with col_card:
             render_article_card(row)
