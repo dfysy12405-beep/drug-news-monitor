@@ -189,8 +189,8 @@ elif dash_filter == "keyword" and dash_keyword:
     articles = db.get_articles(keyword=dash_keyword)
     section_title = f"🏷️ #{dash_keyword} 관련 기사"
 else:
-    articles = db.get_articles(limit=15)
-    section_title = "📰 최근 수집 기사"
+    articles = db.get_articles()
+    section_title = "📰 전체 수집 기사"
 
 st.markdown(f"#### {section_title} &nbsp; <span style='font-size:0.9rem;color:#64748b;font-weight:400;'>({len(articles)}건)</span>", unsafe_allow_html=True)
 
