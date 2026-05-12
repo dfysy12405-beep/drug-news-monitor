@@ -337,5 +337,3 @@ Streamlit Cloud 외에 Render도 가능합니다.
 OpenAI API 사용 시 API 비용은 사용자 부담입니다.
 
 문의/개선 사항이 있으면 담당자에게 전달해 주세요.
-#   d r u g - n e w s - m o n i t o r  
- 
