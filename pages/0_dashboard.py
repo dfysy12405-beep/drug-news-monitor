@@ -265,33 +265,36 @@ elif group_mode:
         if count > 1:
             related = grp["articles"][1:]
             sources_str = " · ".join(grp["sources"][:3])
-            with st.expander(f"📎 관련 기사 {len(related)}건 펼치기 &nbsp;|&nbsp; {sources_str}", expanded=False):
+            with st.expander(f"📎 관련 기사 {len(related)}건 펼치기  |  {sources_str}", expanded=False):
                 for rel in related:
-                    url   = rel.get("url", "")
-                    title = rel.get("title", "")
-                    src   = rel.get("source", "")
-                    pub   = rel.get("published_date", "")
-                    imp   = rel.get("importance", "보통")
-                    imp_icon = "🟢" if imp == "높음" else ("🟡" if imp == "보통" else "⚪")
+                    _url   = rel.get("url", "")
+                    _title = rel.get("title", "(제목 없음)")
+                    _src   = rel.get("source", "")
+                    _pub   = rel.get("published_date", "")
+                    _imp   = rel.get("importance", "보통")
+                    _imp_icon = "🟢" if _imp == "높음" else ("🟡" if _imp == "보통" else "⚪")
 
-                    if url and url.startswith("http"):
-                        title_html = (
-                            f'<a href="{url}" target="_blank" '
-                            f'style="color:#0f172a;text-decoration:none;font-size:0.93rem;font-weight:500;" '
-                            f'onmouseover="this.style.color='#0d9488'" '
-                            f'onmouseout="this.style.color='#0f172a'">'
-                            f'{imp_icon} {title} 🔗</a>'
+                    # 제목 (링크 or 텍스트) — 따옴표 충돌 방지를 위해 변수로 분리
+                    if _url and _url.startswith("http"):
+                        _title_part = (
+                            '<a href="' + _url + '" target="_blank" '
+                            'style="color:#0f172a;text-decoration:none;'
+                            'font-size:0.95rem;font-weight:600;">'
+                            + _imp_icon + ' ' + _title + ' 🔗</a>'
                         )
                     else:
-                        title_html = f'<span style="font-size:0.93rem;font-weight:500;">{imp_icon} {title}</span>'
+                        _title_part = (
+                            '<span style="font-size:0.95rem;font-weight:600;color:#0f172a;">'
+                            + _imp_icon + ' ' + _title + '</span>'
+                        )
 
                     st.markdown(
-                        f'<div style="background:#f8fafc;border-left:3px solid #cbd5e1;'
-                        f'border-radius:0 6px 6px 0;padding:10px 14px;margin-bottom:8px;">'
-                        f'{title_html}'
-                        f'<div style="font-size:0.76rem;color:#94a3b8;margin-top:4px;">'
-                        f'📰 {src} &nbsp;|&nbsp; {pub}</div>'
-                        f'</div>',
+                        '<div style="background:#f8fafc;border-left:3px solid #0d9488;'
+                        'border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:8px;">'
+                        + _title_part +
+                        '<div style="font-size:0.78rem;color:#64748b;margin-top:5px;">'
+                        '📰 <b>' + _src + '</b> &nbsp;|&nbsp; 발행 ' + _pub +
+                        '</div></div>',
                         unsafe_allow_html=True,
                     )
 else:

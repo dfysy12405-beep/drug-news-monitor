@@ -263,29 +263,29 @@ if view_mode == "🗂️ 유사 기사 묶어서 보기":
                     cat   = rel.get("category", "")
                     imp_icon = "🟢" if imp == "높음" else ("🟡" if imp == "보통" else "⚪")
 
+                    # 따옴표 충돌 방지를 위해 문자열 연결 방식 사용
                     if url and url.startswith("http"):
-                        title_html = (
-                            f'<a href="{url}" target="_blank" '
-                            f'style="color:#0f172a;text-decoration:none;'
-                            f'font-size:0.95rem;font-weight:600;line-height:1.4;" '
-                            f'onmouseover="this.style.color='#0d9488';this.style.textDecoration='underline'" '
-                            f'onmouseout="this.style.color='#0f172a';this.style.textDecoration='none'">'
-                            f'{title} 🔗</a>'
+                        _title_part = (
+                            '<a href="' + url + '" target="_blank" '
+                            'style="color:#0f172a;text-decoration:none;'
+                            'font-size:0.95rem;font-weight:600;line-height:1.5;">'
+                            + imp_icon + ' ' + title + ' 🔗</a>'
                         )
                     else:
-                        title_html = (
-                            f'<span style="font-size:0.95rem;font-weight:600;color:#0f172a;">'
-                            f'{title}</span>'
+                        _title_part = (
+                            '<span style="font-size:0.95rem;font-weight:600;color:#0f172a;">'
+                            + imp_icon + ' ' + title + '</span>'
                         )
 
                     st.markdown(
-                        f'<div style="background:#f8fafc;border-left:3px solid #0d9488;'
-                        f'border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:10px;">'
-                        f'<div style="margin-bottom:6px;">{imp_icon} {title_html}</div>'
-                        f'<div style="font-size:0.78rem;color:#64748b;">'
-                        f'📰 <b>{src}</b> &nbsp;|&nbsp; 발행 {pub} &nbsp;|&nbsp; {cat}'
-                        f'</div>'
-                        f'</div>',
+                        '<div style="background:#f8fafc;border-left:3px solid #0d9488;'
+                        'border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:10px;">'
+                        + _title_part +
+                        '<div style="font-size:0.78rem;color:#64748b;margin-top:6px;">'
+                        '📰 <b>' + src + '</b>'
+                        ' &nbsp;|&nbsp; 발행 ' + pub +
+                        ' &nbsp;|&nbsp; ' + cat +
+                        '</div></div>',
                         unsafe_allow_html=True,
                     )
         st.markdown("")  # 간격
