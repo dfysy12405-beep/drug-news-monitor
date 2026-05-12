@@ -95,6 +95,82 @@ with st.sidebar:
 page_header("📊", "대시보드", "마약류 및 약물 오남용 관련 언론 동향 종합 모니터링")
 
 # ============================================================
+# 일간 브리핑 (오늘 날짜 기준 자동 생성)
+# ============================================================
+@st.cache_data(show_spinner=False, ttl=300)
+def _build_daily_briefing(today_str: str) -> str:
+    """오늘 수집 기사 기반 일간 브리핑 텍스트 자동 생성."""
+    from collections import Counter
+
+    today_df = db.get_articles(start_date=today_str, end_date=today_str)
+    high_df  = db.get_articles(
+        start_date=today_str, end_date=today_str, importance="높음"
+    )
+
+    if today_df.empty:
+        return ""
+
+    # 키워드 집계
+    all_kws = []
+    for kws in today_df["keywords"].fillna(""):
+        all_kws.extend([k.strip() for k in kws.split(",") if k.strip()])
+    top_kws = [k for k, _ in Counter(all_kws).most_common(6)]
+
+    # 카테고리별 카운트
+    cat_counts = today_df["category"].fillna("기타").value_counts()
+
+    lines = []
+    lines.append(f"📅 **{today_str} 일간 브리핑**")
+    lines.append(f"수집 기사 **{len(today_df)}건** · 중요 기사 **{len(high_df)}건**")
+    lines.append("")
+
+    # 중요 기사
+    if not high_df.empty:
+        lines.append("**🔴 주요 기사**")
+        for _, row in high_df.head(5).iterrows():
+            url = row.get("url", "")
+            title = row.get("title", "")
+            src   = row.get("source", "")
+            if url and url.startswith("http"):
+                lines.append(f"- [{title}]({url}) _{src}_")
+            else:
+                lines.append(f"- {title} _{src}_")
+        lines.append("")
+
+    # 키워드
+    if top_kws:
+        lines.append("**🏷️ 오늘의 키워드**")
+        lines.append("  ".join([f"`#{k}`" for k in top_kws]))
+        lines.append("")
+
+    # 카테고리 분포
+    if not cat_counts.empty:
+        lines.append("**📂 분류별 현황**")
+        cat_strs = [f"{cat} {cnt}건" for cat, cnt in cat_counts.items()]
+        lines.append(" · ".join(cat_strs))
+
+    return "\n".join(lines)
+
+_today_str = datetime.now().strftime("%Y-%m-%d")
+_briefing_text = _build_daily_briefing(_today_str)
+
+if _briefing_text:
+    with st.expander("📋 오늘의 일간 브리핑 — 클릭해서 펼치기", expanded=True):
+        st.markdown(_briefing_text)
+        # 복사용 텍스트 (링크 없는 순수 텍스트)
+        _plain = _briefing_text.replace("**", "").replace("`", "")
+        st.download_button(
+            "📥 브리핑 텍스트 다운로드",
+            data=_plain.encode("utf-8"),
+            file_name=f"브리핑_{_today_str}.txt",
+            mime="text/plain",
+            key="briefing_download",
+        )
+else:
+    st.info(f"📋 오늘({_today_str}) 수집된 기사가 없습니다. [📥 기사수집] 에서 RSS 수집을 먼저 해주세요.")
+
+
+# ============================================================
 # (1) KPI 카드 - 클릭하면 아래 기사 목록이 필터됨
 # ============================================================
 total_articles = db.get_article_count()
