@@ -2,23 +2,17 @@
 ==============================================================
  공통 UI 유틸리티 (utils.py)
 ==============================================================
- - 중요도/카테고리 배지 HTML 생성
- - 키워드 태그 HTML 생성
- - 기사 카드 렌더링
-==============================================================
 """
 
 import streamlit as st
 
-
-# 중요도별 색상
+# 중요도별 색상 (높음 → 민트색으로 변경)
 IMPORTANCE_COLORS = {
-    "높음": ("#dc2626", "#fee2e2"),   # 빨강
+    "높음": ("#0d9488", "#f0fdfa"),   # 민트/틸
     "보통": ("#2563eb", "#dbeafe"),   # 파랑
     "낮음": ("#64748b", "#f1f5f9"),   # 회색
 }
 
-# 카테고리별 색상
 CATEGORY_COLORS = {
     "사건·사고": "#ef4444",
     "정책·법률": "#3b82f6",
@@ -34,9 +28,8 @@ CATEGORY_LIST = list(CATEGORY_COLORS.keys())
 
 
 def badge_importance(importance: str) -> str:
-    """중요도 배지 HTML 반환."""
     fg, bg = IMPORTANCE_COLORS.get(importance, IMPORTANCE_COLORS["보통"])
-    icon = "🔴" if importance == "높음" else ("🟡" if importance == "보통" else "⚪")
+    icon = "🟢" if importance == "높음" else ("🟡" if importance == "보통" else "⚪")
     return (
         f'<span style="background:{bg};color:{fg};padding:2px 10px;'
         f'border-radius:12px;font-size:0.8rem;font-weight:600;'
@@ -45,7 +38,6 @@ def badge_importance(importance: str) -> str:
 
 
 def badge_category(category: str) -> str:
-    """카테고리 배지 HTML."""
     color = CATEGORY_COLORS.get(category, "#64748b")
     return (
         f'<span style="background:{color}1a;color:{color};'
@@ -56,7 +48,6 @@ def badge_category(category: str) -> str:
 
 
 def keyword_tags(keywords_str: str, max_tags: int = 6) -> str:
-    """쉼표로 구분된 키워드 문자열을 태그 HTML로 변환."""
     if not keywords_str:
         return ""
     kws = [k.strip() for k in keywords_str.split(",") if k.strip()][:max_tags]
@@ -70,32 +61,44 @@ def keyword_tags(keywords_str: str, max_tags: int = 6) -> str:
     return html
 
 
-def render_article_card(row: dict, show_summary: bool = True):
-    """기사 카드 1개를 렌더링. row는 dict 또는 pandas Series."""
+def render_article_card(row, show_summary: bool = True):
+    """기사 카드 렌더링 - 제목 클릭 시 원문 링크 새 창으로 이동."""
     if hasattr(row, "to_dict"):
         row = row.to_dict()
 
     importance = row.get("importance", "보통")
     fg_color = IMPORTANCE_COLORS.get(importance, IMPORTANCE_COLORS["보통"])[0]
-    border_left = "4px solid " + fg_color if importance == "높음" else "1px solid #e2e8f0"
+    border_left = f"4px solid {fg_color}" if importance == "높음" else "1px solid #e2e8f0"
 
-    title_html = row.get("title", "(제목 없음)")
+    title = row.get("title", "(제목 없음)")
     source = row.get("source", "")
     pub_date = row.get("published_date", "")
     col_date = row.get("collected_date", "")
     summary = row.get("summary", "")
-    url = row.get("url", "#")
+    url = row.get("url", "")
     fav = "⭐ " if row.get("is_favorite") else ""
 
+    # 제목: URL 있으면 클릭 시 새 창으로 원문 이동
+    if url and url.startswith("http"):
+        title_html = (
+            f'<a href="{url}" target="_blank" '
+            f'style="color:#0f172a;text-decoration:none;font-weight:600;font-size:1.0rem;line-height:1.4;" '
+            f'onmouseover="this.style.color=\'#0d9488\';this.style.textDecoration=\'underline\'" '
+            f'onmouseout="this.style.color=\'#0f172a\';this.style.textDecoration=\'none\'">'
+            f'{fav}{title} 🔗</a>'
+        )
+    else:
+        title_html = f'<span style="font-weight:600;font-size:1.0rem;color:#0f172a;">{fav}{title}</span>'
+
     card = f"""
-    <div style="background:white;border:{border_left};border-radius:8px;
-                padding:14px 18px;margin-bottom:12px;
+    <div style="background:white;border-left:{border_left};
+                border-top:1px solid #e2e8f0;border-right:1px solid #e2e8f0;
+                border-bottom:1px solid #e2e8f0;border-radius:8px;
+                padding:14px 18px;margin-bottom:10px;
                 box-shadow:0 1px 2px rgba(0,0,0,0.04);">
         <div style="display:flex;justify-content:space-between;align-items:start;">
             <div style="flex:1;">
-                <div style="font-size:1.0rem;font-weight:600;color:#1e293b;line-height:1.4;">
-                    {fav}{title_html}
-                </div>
+                <div>{title_html}</div>
                 <div style="font-size:0.78rem;color:#64748b;margin-top:4px;">
                     📰 {source} &nbsp;|&nbsp; 발행 {pub_date} &nbsp;|&nbsp; 수집 {col_date}
                 </div>
@@ -103,8 +106,8 @@ def render_article_card(row: dict, show_summary: bool = True):
             <div style="margin-left:12px;">{badge_importance(importance)}</div>
         </div>
         {f'<div style="margin-top:8px;color:#475569;font-size:0.88rem;line-height:1.5;">{summary}</div>' if show_summary and summary else ''}
-        <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;">
-            <div>{badge_category(row.get('category', '기타'))} &nbsp; {keyword_tags(row.get('keywords', ''))}</div>
+        <div style="margin-top:10px;">
+            {badge_category(row.get("category", "기타"))} &nbsp; {keyword_tags(row.get("keywords", ""))}
         </div>
     </div>
     """
@@ -112,26 +115,9 @@ def render_article_card(row: dict, show_summary: bool = True):
 
 
 def page_header(icon: str, title: str, desc: str = ""):
-    """페이지 상단 헤더 표시."""
     st.markdown(f"""
     <div style="padding:14px 0 6px 0;border-bottom:2px solid #e2e8f0;margin-bottom:18px;">
         <div style="font-size:1.5rem;font-weight:700;color:#0f172a;">{icon} {title}</div>
         {f'<div style="font-size:0.9rem;color:#64748b;margin-top:4px;">{desc}</div>' if desc else ''}
     </div>
     """, unsafe_allow_html=True)
-
-
-def metric_card(label: str, value, delta=None, color: str = "#2563eb"):
-    """대시보드용 KPI 카드."""
-    delta_html = (
-        f'<div style="font-size:0.78rem;color:#10b981;margin-top:4px;">▲ {delta}</div>'
-        if delta else ""
-    )
-    return f"""
-    <div style="background:white;border:1px solid #e2e8f0;border-radius:8px;
-                padding:16px 18px;height:100%;">
-        <div style="font-size:0.82rem;color:#64748b;">{label}</div>
-        <div style="font-size:1.8rem;font-weight:700;color:{color};margin-top:4px;">{value}</div>
-        {delta_html}
-    </div>
-    """
