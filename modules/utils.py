@@ -94,19 +94,19 @@ def render_article_card(row, show_summary: bool = True):
     <div style="background:white;border-left:{border_left};
                 border-top:1px solid #e2e8f0;border-right:1px solid #e2e8f0;
                 border-bottom:1px solid #e2e8f0;border-radius:8px;
-                padding:14px 18px;margin-bottom:10px;
+                padding:12px 14px;margin-bottom:10px;
                 box-shadow:0 1px 2px rgba(0,0,0,0.04);">
-        <div style="display:flex;justify-content:space-between;align-items:start;">
-            <div style="flex:1;">
-                <div>{title_html}</div>
-                <div style="font-size:0.78rem;color:#64748b;margin-top:4px;">
-                    📰 {source} &nbsp;|&nbsp; 발행 {pub_date} &nbsp;|&nbsp; 수집 {col_date}
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;">
+            <div style="flex:1;min-width:0;">
+                <div style="word-break:keep-all;overflow-wrap:break-word;">{title_html}</div>
+                <div style="font-size:0.75rem;color:#64748b;margin-top:4px;word-break:break-all;">
+                    📰 {source} &nbsp;|&nbsp; 발행 {pub_date}
                 </div>
             </div>
-            <div style="margin-left:12px;">{badge_importance(importance)}</div>
+            <div style="flex-shrink:0;">{badge_importance(importance)}</div>
         </div>
-        {f'<div style="margin-top:8px;color:#475569;font-size:0.88rem;line-height:1.5;">{summary}</div>' if show_summary and summary else ''}
-        <div style="margin-top:10px;">
+        {f'<div style="margin-top:8px;color:#475569;font-size:0.85rem;line-height:1.55;word-break:keep-all;">{summary}</div>' if show_summary and summary else ''}
+        <div style="margin-top:10px;overflow:hidden;">
             {badge_category(row.get("category", "기타"))} &nbsp; {keyword_tags(row.get("keywords", ""))}
         </div>
     </div>

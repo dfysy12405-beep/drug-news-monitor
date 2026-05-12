@@ -142,7 +142,7 @@ with st.container():
         "중요도순":        "CASE importance WHEN '높음' THEN 0 WHEN '보통' THEN 1 ELSE 2 END, collected_date DESC",
         "오래된순":        "collected_date ASC, id ASC",
     }
-    sort_label = c2.selectbox("🔃 정렬", list(sort_options.keys()))
+    sort_label = c2.selectbox("🔃 정렬", list(sort_options.keys()), index=1)
     today_only = c3.checkbox("오늘 수집만", value=False)
 
     # 둘째 줄: 카테고리 / 중요도 / 기간

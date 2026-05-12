@@ -15,9 +15,11 @@ from modules.utils import page_header, render_article_card, badge_category
 
 st.markdown("""
 <style>
+    /* PC 기본 */
     .block-container { padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1400px; }
     [data-testid="stSidebar"] { background: #f8fafc; }
-    /* 버튼 전체 너비 + 카드 스타일 */
+
+    /* 버튼 스타일 */
     div[data-testid="stButton"] > button {
         width: 100%;
         border-radius: 8px;
@@ -31,6 +33,25 @@ st.markdown("""
     div[data-testid="stButton"] > button:hover {
         border-color: #0d9488;
         color: #0d9488;
+    }
+
+    /* 모바일 반응형 */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 1rem !important;
+        }
+        /* 폰트 크기 조절 */
+        div[data-testid="stButton"] > button {
+            font-size: 0.82rem !important;
+            padding: 8px 4px !important;
+            height: auto !important;
+        }
+        /* 카드 내 텍스트 줄임 */
+        .stMarkdown p { font-size: 0.88rem !important; }
+        /* 사이드바 토글 버튼 크게 */
+        [data-testid="collapsedControl"] { top: 0.5rem !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -167,7 +188,7 @@ sort_options = {
     "오래된순":         "collected_date ASC, id ASC",
 }
 sort_col, _ = st.columns([2, 5])
-sort_label = sort_col.selectbox("🔃 정렬", list(sort_options.keys()), label_visibility="collapsed")
+sort_label = sort_col.selectbox("🔃 정렬", list(sort_options.keys()), index=1, label_visibility="collapsed")
 order_by = sort_options[sort_label]
 
 if dash_filter == "today":
