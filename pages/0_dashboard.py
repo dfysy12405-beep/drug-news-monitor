@@ -241,7 +241,7 @@ else:
 t1, t2, t3 = st.columns([4, 2, 2])
 t1.markdown(f"#### {section_title} &nbsp; <span style='font-size:0.9rem;color:#64748b;font-weight:400;'>({len(articles)}건)</span>", unsafe_allow_html=True)
 t2.markdown(f"<div style='text-align:right;padding-top:8px;color:#64748b;font-size:0.85rem;'>🔃 {sort_label}</div>", unsafe_allow_html=True)
-group_mode = t3.toggle("🗂️ 유사 기사 묶기", value=False, key="dash_group_toggle")
+group_mode = t3.toggle("🗂️ 유사 기사 묶기", value=True, key="dash_group_toggle")
 
 if articles.empty:
     st.info("해당 조건의 기사가 없습니다.")

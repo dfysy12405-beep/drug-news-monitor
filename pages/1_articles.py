@@ -203,6 +203,7 @@ if df.empty:
 view_mode = st.radio(
     "표시 형식",
     ["📇 개별 기사로 보기", "🗂️ 유사 기사 묶어서 보기", "📊 표형식"],
+    index=1,
     horizontal=True,
     label_visibility="collapsed",
 )
