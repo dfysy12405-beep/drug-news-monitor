@@ -1,3 +1,7 @@
+# Drug News Monitor - 가짜뉴스 생성 방지 수정본
+
+이 수정본은 기존 Streamlit Cloud 배포 구조를 유지하면서, 실제 기사처럼 보이는 샘플 기사 자동 생성 기능을 제거한 버전입니다. RSS 수집, CSV 업로드, 수동 등록으로 확인된 기사만 저장됩니다.
+
 # 📰 마약류 언론동향 모니터링 시스템
 
 > AI 기반 마약류 예방사업 언론동향 관리 플랫폼
@@ -46,7 +50,7 @@ drug-news-monitor/
 │
 ├── modules/                      # 핵심 로직
 │   ├── __init__.py
-│   ├── database.py               # SQLite + 샘플 데이터 + CRUD
+│   ├── database.py               # SQLite + 기본 키워드 + CRUD
 │   ├── ai_helper.py              # AI(GPT)/규칙 기반 분석
 │   ├── rss_collector.py          # Google News RSS 수집
 │   ├── analyzer.py               # 추천 키워드 분석, 트렌드
@@ -145,7 +149,7 @@ streamlit run app.py
 ```
 
 - 자동으로 브라우저에서 `http://localhost:8501` 가 열립니다.
-- 처음 실행 시 자동으로 `data/monitor.db` 가 생성되고, **샘플 기사 30건과 기본 키워드 8개**가 입력됩니다.
+- 처음 실행 시 자동으로 `data/monitor.db` 가 생성되고, **기본 검색 키워드 8개만** 입력됩니다. 실제 기사처럼 보이는 샘플 기사는 생성하지 않습니다.
 - 중단할 때는 터미널에서 `Ctrl + C`
 
 ## ⑧ (선택) OpenAI API 키 등록
@@ -248,7 +252,7 @@ Streamlit Cloud 외에 Render도 가능합니다.
 5. **Environment Variables** 에 `OPENAI_API_KEY` 추가 (선택)
 6. **Create Web Service** 클릭 → 5~10분 후 배포 완료
 
-> ⚠️ Render 무료 플랜은 15분간 미접속 시 잠자기 상태로 전환되어 첫 접속이 느려질 수 있습니다. 상시 빠른 접속이 필요하면 Streamlit Cloud 권장.
+> ⚠️ Render 무료 플랜은 15분간 미접속 시 잠자기 상태로 전환되어 첫 접속이 느려질 수 있습니다. 앱 깨우기 문제를 줄이려면 Starter 이상 유료 인스턴스를 권장합니다.
 
 ---
 
@@ -337,3 +341,21 @@ Streamlit Cloud 외에 Render도 가능합니다.
 OpenAI API 사용 시 API 비용은 사용자 부담입니다.
 
 문의/개선 사항이 있으면 담당자에게 전달해 주세요.
+
+
+---
+
+# ✅ 이번 Render 배포용 수정 사항
+
+- 첫 실행 시 생성되던 시연용 샘플 기사 30건을 제거했습니다.
+- 기사 목록에는 RSS 수집, CSV 업로드, 수동 등록으로 입력된 기사만 저장됩니다.
+- OpenAI 요약 프롬프트를 보수적으로 수정하여, 원문에 없는 수치·기관명·사건 내용을 추가하지 않도록 했습니다.
+- Render 배포용 `render.yaml`, `Procfile`, `runtime.txt`를 추가했습니다.
+- 기존 `data/monitor.db`는 포함하지 않았습니다. 배포 후 새 DB가 생성됩니다.
+
+## Render 설정값
+
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true`
+- Environment: Python
+

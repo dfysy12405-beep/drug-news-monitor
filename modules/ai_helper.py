@@ -98,7 +98,7 @@ def _gpt_summarize(title, content):
     from openai import OpenAI
     client = OpenAI(api_key=_get_api_key())
 
-    prompt = f"""다음 기사를 3줄로 요약해주세요. 마약류 예방교육 담당자가 빠르게 파악할 수 있는 형식으로 작성하세요.
+    prompt = f"""다음 기사를 3줄 이내로 요약해주세요. 반드시 제공된 제목과 본문에 있는 사실만 사용하고, 원문에 없는 수치·기관명·사건 내용은 절대 추가하지 마세요.
 
 [제목]
 {title}
@@ -109,7 +109,8 @@ def _gpt_summarize(title, content):
 [요약 규칙]
 - 한국어 3문장 이내
 - 핵심 사실 위주
-- 마약류·예방교육 관점에서 시사점 포함"""
+- 원문에 명시되지 않은 해석, 추정, 배경 설명 금지
+- 본문 정보가 부족하면 "본문 정보 부족: 제목 기준 확인 필요"라고 표시"""
 
     res = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -117,7 +118,7 @@ def _gpt_summarize(title, content):
             {"role": "system", "content": "당신은 마약류 예방사업 담당 분석가입니다."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.3,
+        temperature=0.0,
     )
     return res.choices[0].message.content.strip()
 
@@ -207,7 +208,7 @@ def _gpt_education_point(title, content, category):
     from openai import OpenAI
     client = OpenAI(api_key=_get_api_key())
 
-    prompt = f"""다음 기사를 마약류 예방교육 강사가 어떻게 활용할 수 있을지 2~3줄로 제안해주세요.
+    prompt = f"""다음 기사 내용을 바탕으로 예방교육 활용 가능성을 2~3줄로 정리해주세요. 반드시 제공된 기사 내용에서 확인되는 범위 안에서만 작성하고, 확인되지 않은 사실은 추가하지 마세요.
 
 [기사 제목] {title}
 [분류] {category}
@@ -216,6 +217,8 @@ def _gpt_education_point(title, content, category):
 규칙:
 - 교육 대상(청소년/성인/노인/학부모 등) 지정
 - 어떤 메시지 전달에 활용 가능한지 명시
+- 기사에 없는 사실·수치·기관명 추가 금지
+- 정보가 부족하면 "본문 확인 후 활용 필요"라고 표시
 - 한국어 2~3문장"""
 
     res = client.chat.completions.create(
@@ -224,7 +227,7 @@ def _gpt_education_point(title, content, category):
             {"role": "system", "content": "당신은 마약류 예방교육 콘텐츠 개발자입니다."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.4,
+        temperature=0.0,
     )
     return res.choices[0].message.content.strip()
 
