@@ -95,17 +95,25 @@ with st.sidebar:
 page_header("📊", "대시보드", "마약류 및 약물 오남용 관련 언론 동향 종합 모니터링")
 
 # ============================================================
-# 일간 브리핑 (오늘 날짜 기준 자동 생성)
+# 일간 브리핑 (기사 발행일 기준 자동 생성)
 # ============================================================
 @st.cache_data(show_spinner=False, ttl=300)
 def _build_daily_briefing(today_str: str) -> str:
-    """오늘 수집 기사 기반 일간 브리핑 텍스트 자동 생성."""
+    """해당일이 발행일인 기사만 대상으로 일간 브리핑 텍스트 자동 생성.
+
+    주의: 수집일(collected_date)이 아니라 기사 발행일(published_date)을 기준으로 한다.
+    과거 발행 기사가 오늘 수집되더라도 일간 브리핑에는 포함하지 않는다.
+    """
     from collections import Counter
 
-    today_df = db.get_articles(start_date=today_str, end_date=today_str)
-    high_df  = db.get_articles(
-        start_date=today_str, end_date=today_str, importance="높음"
-    )
+    # db.get_articles()의 start_date/end_date는 수집일 기준이므로,
+    # 일간 브리핑은 전체 조회 후 published_date로 별도 필터링한다.
+    all_df = db.get_articles(order_by="published_date DESC, id DESC")
+    if all_df.empty or "published_date" not in all_df.columns:
+        return ""
+
+    today_df = all_df[all_df["published_date"].fillna("").astype(str).str[:10] == today_str].copy()
+    high_df = today_df[today_df["importance"].fillna("") == "높음"].copy()
 
     if today_df.empty:
         return ""
@@ -121,7 +129,7 @@ def _build_daily_briefing(today_str: str) -> str:
 
     lines = []
     lines.append(f"📅 **{today_str} 일간 브리핑**")
-    lines.append(f"수집 기사 **{len(today_df)}건** · 중요 기사 **{len(high_df)}건**")
+    lines.append(f"발행일 기준 기사 **{len(today_df)}건** · 중요 기사 **{len(high_df)}건**")
     lines.append("")
 
     # 중요 기사
@@ -167,7 +175,7 @@ if _briefing_text:
             key="briefing_download",
         )
 else:
-    st.info(f"📋 오늘({_today_str}) 수집된 기사가 없습니다. [📥 기사수집] 에서 RSS 수집을 먼저 해주세요.")
+    st.info(f"📋 오늘({_today_str}) 발행된 기사가 없습니다. 일간 브리핑은 기사 발행일 기준으로만 구성됩니다.")
 
 
 # ============================================================
