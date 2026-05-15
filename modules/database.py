@@ -4,7 +4,7 @@
 ==============================================================
  - SQLite DB 생성 및 초기화
  - articles / keywords / recommended_keywords 3개 테이블 관리
- - 기본 키워드 자동 입력
+ - articles / keywords / recommended_keywords 3개 테이블 관리
  - 기사/키워드 CRUD 함수 제공
 ==============================================================
 """
@@ -38,7 +38,11 @@ def get_conn():
 # 2. 테이블 생성
 # ------------------------------------------------------------
 def init_db():
-    """DB가 없으면 새로 생성하고 테이블 및 기본 키워드를 초기화."""
+    """DB가 없으면 새로 생성하고 테이블을 초기화.
+
+    키워드는 사용자가 직접 등록하거나 추천 키워드 승인 시에만
+    활성 수집 키워드로 반영한다.
+    """
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
     with get_conn() as conn:
@@ -95,39 +99,10 @@ def init_db():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_articles_importance ON articles(importance)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category)")
 
-    # 첫 실행 시 기본 키워드만 입력한다.
-    _insert_default_keywords()
-
 
 # ------------------------------------------------------------
-# 3. 기본 키워드 입력
+# 3. 샘플 기사 생성 방지
 # ------------------------------------------------------------
-def _insert_default_keywords():
-    """프로그램 첫 실행 시 기본 검색 키워드만 입력.
-
-    주의: 실제 기사처럼 보이는 샘플 데이터는 입력하지 않는다.
-    기사 테이블에는 RSS 수집, CSV 업로드, 수동 등록으로 확인된 기사만 저장한다.
-    """
-    default_keywords = [
-        ("마약", "핵심"),
-        ("한국마약퇴치운동본부", "기관"),
-        ("약물 오남용", "핵심"),
-        ("청소년 마약", "대상"),
-        ("펜타닐", "약물"),
-        ("의료용 마약류", "분야"),
-        ("예방교육", "사업"),
-        ("강원 마약", "지역"),
-    ]
-    today = datetime.now().strftime("%Y-%m-%d")
-    with get_conn() as conn:
-        cur = conn.cursor()
-        for kw, ktype in default_keywords:
-            cur.execute("""
-                INSERT OR IGNORE INTO keywords (keyword, keyword_type, is_active, created_date)
-                VALUES (?, ?, 1, ?)
-            """, (kw, ktype, today))
-
-
 def seed_sample_data():
     """샘플 기사 생성 기능은 비활성화.
 
