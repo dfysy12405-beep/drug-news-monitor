@@ -75,6 +75,7 @@ with tab_rss:
                 all_registered_kws = db.get_keywords()["keyword"].tolist()
                 inserted = 0
                 skipped = 0
+                unknown_date = 0
                 progress = st.progress(0)
 
                 for i, a in enumerate(articles):
@@ -103,6 +104,9 @@ with tab_rss:
                         "importance": analysis["importance"],
                         "education_point": analysis["education_point"],
                     })
+                    if not a.get("published_date"):
+                        unknown_date += 1
+
                     if success:
                         inserted += 1
                     else:
@@ -111,6 +115,11 @@ with tab_rss:
 
                 db.refresh_keyword_stats()
                 st.success(f"✅ 신규 등록: **{inserted}건** / 중복 스킵: {skipped}건")
+                if unknown_date:
+                    st.info(
+                        f"발행일을 원문에서 확인하지 못한 기사 **{unknown_date}건**은 발행일을 비워두었습니다. "
+                        "해당 기사는 일간 브리핑에 포함되지 않습니다."
+                    )
 
 
 # ============================================================

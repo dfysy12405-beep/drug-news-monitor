@@ -198,7 +198,7 @@ def insert_article(article: dict):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 article.get("collected_date", datetime.now().strftime("%Y-%m-%d")),
-                article.get("published_date", datetime.now().strftime("%Y-%m-%d")),
+                article.get("published_date") or "",
                 article.get("source", ""),
                 article.get("title", ""),
                 article.get("url", ""),

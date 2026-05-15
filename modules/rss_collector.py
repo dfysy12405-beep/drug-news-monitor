@@ -4,17 +4,79 @@
 ==============================================================
  - Google News RSS 기반 기사 수집
  - Google News 리다이렉트 URL → 실제 원문 URL 자동 변환
+ - 기사 발행일은 원문 메타데이터에서 확인 가능한 경우에만 저장
+   ※ Google News RSS의 published 값은 실제 기사 발행일이 아니라
+      Google News 수집/갱신 시각일 수 있어 옛날 기사가 오늘 기사처럼
+      분류되는 문제가 발생할 수 있음
 ==============================================================
 """
 
 import re
 import base64
-import struct
+import json
 from urllib.parse import quote, urlparse, parse_qs
 from datetime import datetime
+import email.utils
+
 import feedparser
 
+try:
+    import requests
+    from bs4 import BeautifulSoup
+except Exception:  # 배포 환경에서 의존성 누락 시에도 앱이 중단되지 않도록 처리
+    requests = None
+    BeautifulSoup = None
+
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
+
+
+# ------------------------------------------------------------
+# 날짜 정규화
+# ------------------------------------------------------------
+def _normalize_date(value: str) -> str:
+    """여러 형식의 날짜 문자열을 YYYY-MM-DD로 변환. 실패 시 빈 문자열."""
+    if not value:
+        return ""
+
+    raw = str(value).strip()
+    if not raw:
+        return ""
+
+    # JSON-LD 등에서 리스트로 들어오는 경우 방어
+    if raw.startswith("[") and raw.endswith("]"):
+        raw = raw.strip("[]").strip('"\' ')
+
+    # 2026. 5. 15. / 2026년 5월 15일 / 2026-05-15 등 우선 처리
+    m = re.search(r"(20\d{2})\D{0,3}(\d{1,2})\D{0,3}(\d{1,2})", raw)
+    if m:
+        y, mo, d = m.groups()
+        try:
+            return datetime(int(y), int(mo), int(d)).strftime("%Y-%m-%d")
+        except Exception:
+            pass
+
+    # ISO / RFC 계열 처리
+    candidates = [
+        raw,
+        raw.replace("Z", "+00:00"),
+        raw.split("+")[0].strip(),
+        raw.split("T")[0].strip(),
+    ]
+    for c in candidates:
+        if not c:
+            continue
+        try:
+            return datetime.fromisoformat(c).strftime("%Y-%m-%d")
+        except Exception:
+            pass
+        try:
+            parsed = email.utils.parsedate_to_datetime(c)
+            if parsed:
+                return parsed.strftime("%Y-%m-%d")
+        except Exception:
+            pass
+
+    return ""
 
 
 # ------------------------------------------------------------
@@ -26,31 +88,24 @@ def _decode_google_news_url(source_url: str) -> str:
     실패하면 원래 URL 그대로 반환.
     """
     try:
-        # 방법 1: URL 파라미터에 직접 URL이 있는 경우
         parsed = urlparse(source_url)
         params = parse_qs(parsed.query)
         if "url" in params:
             return params["url"][0]
 
-        # 방법 2: Google News 인코딩된 URL 디코딩
-        # https://news.google.com/rss/articles/CBMi... 형태
         if "news.google.com" in source_url and "/articles/" in source_url:
             path = source_url.split("/articles/")[-1].split("?")[0]
-            # Base64 디코딩 시도
             try:
-                # 패딩 맞추기
                 padding = 4 - len(path) % 4
                 if padding != 4:
                     path += "=" * padding
                 decoded = base64.b64decode(path.replace("-", "+").replace("_", "/"))
-                # 디코딩된 바이트에서 URL 패턴 추출
                 url_match = re.search(rb'https?://[^\x00-\x1f\x7f-\xff"<> ]+', decoded)
                 if url_match:
                     return url_match.group(0).decode("utf-8")
             except Exception:
                 pass
 
-        # 방법 3: source_url 안의 http 패턴 직접 추출
         url_match = re.search(r'https?://(?!news\.google\.com)[^\s"<>]+', source_url)
         if url_match:
             return url_match.group(0)
@@ -58,8 +113,88 @@ def _decode_google_news_url(source_url: str) -> str:
     except Exception:
         pass
 
-    # 변환 실패 시 원래 URL 반환
     return source_url
+
+
+# ------------------------------------------------------------
+# 원문 기사 발행일 추출
+# ------------------------------------------------------------
+def _extract_published_date_from_article(url: str) -> str:
+    """
+    원문 페이지의 메타태그/JSON-LD에서 실제 발행일을 추출한다.
+    추출 실패 시 빈 문자열을 반환한다.
+
+    주의: Google News RSS의 published 값은 실제 발행일이 아닐 수 있으므로
+    일간 브리핑 기준일로 사용하지 않는다.
+    """
+    if not url or requests is None or BeautifulSoup is None:
+        return ""
+
+    try:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+            )
+        }
+        resp = requests.get(url, headers=headers, timeout=7, allow_redirects=True)
+        if resp.status_code >= 400 or not resp.text:
+            return ""
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        meta_keys = [
+            ("property", "article:published_time"),
+            ("property", "og:article:published_time"),
+            ("name", "article:published_time"),
+            ("name", "pubdate"),
+            ("name", "publishdate"),
+            ("name", "publish_date"),
+            ("name", "date"),
+            ("name", "dc.date"),
+            ("name", "dc.date.issued"),
+            ("name", "dcterms.created"),
+            ("itemprop", "datePublished"),
+        ]
+        for attr, key in meta_keys:
+            tag = soup.find("meta", attrs={attr: key})
+            if tag:
+                date = _normalize_date(tag.get("content", ""))
+                if date:
+                    return date
+
+        time_tag = soup.find("time")
+        if time_tag:
+            date = _normalize_date(time_tag.get("datetime", "") or time_tag.get_text(" ", strip=True))
+            if date:
+                return date
+
+        # JSON-LD 기사 구조에서 datePublished/dateCreated 추출
+        for script in soup.find_all("script", type="application/ld+json"):
+            text = script.string or script.get_text(" ", strip=True)
+            if not text:
+                continue
+            try:
+                data = json.loads(text)
+            except Exception:
+                continue
+
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                graph = item.get("@graph")
+                if isinstance(graph, list):
+                    items.extend([g for g in graph if isinstance(g, dict)])
+                for key in ("datePublished", "dateCreated", "uploadDate"):
+                    date = _normalize_date(item.get(key, ""))
+                    if date:
+                        return date
+
+    except Exception:
+        return ""
+
+    return ""
 
 
 def fetch_google_news(keyword: str, max_items: int = 10) -> list:
@@ -69,14 +204,14 @@ def fetch_google_news(keyword: str, max_items: int = 10) -> list:
 
     results = []
     for entry in feed.entries[:max_items]:
-        # 발행일 파싱
+        # Google News RSS의 published_parsed는 '구글 뉴스 노출/갱신일'일 수 있으므로
+        # 일간 브리핑용 발행일로 저장하지 않는다. 참고용 필드로만 보관한다.
         try:
-            pub = entry.published_parsed
-            pub_date = datetime(*pub[:6]).strftime("%Y-%m-%d")
+            rss_pub = entry.published_parsed
+            rss_date = datetime(*rss_pub[:6]).strftime("%Y-%m-%d")
         except Exception:
-            pub_date = datetime.now().strftime("%Y-%m-%d")
+            rss_date = ""
 
-        # 제목에서 언론사 분리 ("제목 - 언론사" 형식)
         title = entry.title
         source = ""
         if " - " in title:
@@ -84,20 +219,22 @@ def fetch_google_news(keyword: str, max_items: int = 10) -> list:
             title = parts[0]
             source = parts[1]
 
-        # 요약문 HTML 태그 제거
         summary = ""
         if hasattr(entry, "summary"):
             summary = re.sub(r"<[^>]+>", " ", entry.summary)
             summary = re.sub(r"\s+", " ", summary).strip()
 
-        # ★ 핵심: Google News 리다이렉트 URL → 실제 원문 URL 변환
         real_url = _decode_google_news_url(entry.link)
+        real_published_date = _extract_published_date_from_article(real_url)
 
         results.append({
             "title": title.strip(),
             "url": real_url,
             "source": source.strip() or "Google News",
-            "published_date": pub_date,
+            # 실제 원문 발행일을 확인한 경우에만 저장한다.
+            # 확인 실패 시 빈 값으로 두어 옛날 기사가 오늘 기사로 분류되지 않게 한다.
+            "published_date": real_published_date,
+            "rss_date": rss_date,
             "summary": summary[:500],
         })
 
