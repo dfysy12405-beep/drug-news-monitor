@@ -96,6 +96,7 @@ with tab_rss:
                     success = db.insert_article({
                         "collected_date": datetime.now().strftime("%Y-%m-%d"),
                         "published_date": a.get("published_date"),
+                        "date_source": a.get("date_source", ""),
                         "source": a.get("source", ""),
                         "title": a["title"],
                         "url": a["url"],
@@ -107,7 +108,7 @@ with tab_rss:
                     })
                     if not a.get("published_date"):
                         unknown_date += 1
-                    elif a.get("published_date") == a.get("rss_date"):
+                    elif a.get("date_source") == "rss_fallback":
                         rss_date_used += 1
 
                     if success:
