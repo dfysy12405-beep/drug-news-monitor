@@ -16,6 +16,8 @@ import pandas as pd
 import streamlit as st
 from supabase import create_client
 
+from modules.date_extractor import safe_date_for_db
+
 
 # ------------------------------------------------------------
 # 1. Supabase 연결
@@ -187,9 +189,13 @@ def insert_article(article: dict):
         if existing.data:
             return False
 
+    # published_date: 빈 문자열 대신 None(DB NULL)으로 저장하여 날짜 타입 오류 방지
+    raw_pub_date = article.get("published_date") or ""
+    safe_pub_date = safe_date_for_db(raw_pub_date)  # None or "YYYY-MM-DD"
+
     data = {
         "collected_date": article.get("collected_date", datetime.now().strftime("%Y-%m-%d")),
-        "published_date": article.get("published_date") or "",
+        "published_date": safe_pub_date,
         "source": article.get("source", ""),
         "title": article.get("title", ""),
         "url": url,
@@ -202,7 +208,20 @@ def insert_article(article: dict):
         "is_favorite": bool(article.get("is_favorite", False)),
     }
 
-    _client().table("articles").insert(data).execute()
+    # date_source 컬럼이 Supabase에 추가된 경우에만 포함
+    date_source = article.get("date_source", "")
+    if date_source:
+        data["date_source"] = date_source
+
+    try:
+        _client().table("articles").insert(data).execute()
+    except Exception as e:
+        # date_source 컬럼이 없는 경우 해당 필드 제거 후 재시도
+        if "date_source" in data and "column" in str(e).lower():
+            data.pop("date_source", None)
+            _client().table("articles").insert(data).execute()
+        else:
+            raise
     return True
 
 

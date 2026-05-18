@@ -6,3 +6,8 @@ Pillow>=10.0.0
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 supabase>=2.3.0
+# 발행일 파싱 정확도 향상 (한국어 상대시간, 다국어 날짜 파싱)
+dateparser>=1.1.8
+# HTML 파싱 인코딩 감지 (EUC-KR 언론사 대응)
+chardet>=5.0.0
+lxml>=4.9.0
