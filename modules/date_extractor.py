@@ -560,55 +560,129 @@ def _extract_from_time_tag(soup, url: str) -> Optional[str]:
 
 
 # 한국 언론사 본문 날짜 패턴
-# 주의: 날짜 전후 문맥을 확인하여 본문 내 날짜(인용, 사건 날짜)와 구별
+# 주의: 본문 내 사건 날짜와 구별하기 위해 "입력/등록/기사입력" 등 날짜 라벨이 있는 문장만 우선 사용
+_BODY_DATE_LABELS_PRIMARY = [
+    "기사입력", "최초입력", "입력", "등록", "승인", "게재", "발행", "송고", "게시"
+]
+_BODY_DATE_LABELS_SECONDARY = [
+    "수정", "최종수정", "업데이트"
+]
+
+_DATE_CORE_PATTERN = (
+    r"20\d{2}\s*(?:[.\-/년]\s*)\d{1,2}\s*(?:[.\-/월]\s*)\d{1,2}"
+    r"(?:\s*일)?"
+    r"(?:\s*(?:오전|오후|AM|PM|am|pm)?\s*\d{1,2}\s*[:：]\s*\d{2}(?:\s*[:：]\s*\d{2})?)?"
+)
+
 _BODY_DATE_PATTERNS = [
-    # "입력 2026.05.18 14:20" / "등록 2026-05-18" 등
-    r"(?:입력|등록|승인|발행|기사입력|최초입력|게재|작성)\s*[:：]?\s*(20\d{2}[\.\-/년\s]+\d{1,2}[\.\-/월\s]+\d{1,2})",
-    # "2026.05.18 입력" 등 (날짜 먼저, 레이블 나중)
-    r"(20\d{2}[\.\-/년\s]+\d{1,2}[\.\-/월\s]+\d{1,2})\s*(?:입력|등록|승인|발행)",
-    # "기사 날짜:" 형태
-    r"기사\s*날짜\s*[:：]\s*(20\d{2}[\.\-/년\s]+\d{1,2}[\.\-/월\s]+\d{1,2})",
-    # 날짜 단독: "2026년 5월 18일" 등 (신중히 사용)
-    r"(20\d{2}년\s*\d{1,2}월\s*\d{1,2}일)",
+    # "입력 2026.05.18 14:20" / "기사입력 : 2026-05-18 09:10"
+    rf"(?:{'|'.join(_BODY_DATE_LABELS_PRIMARY)})\s*[:：]?\s*({_DATE_CORE_PATTERN})",
+    # "2026.05.18 14:20 입력" 등 날짜 먼저, 라벨 나중
+    rf"({_DATE_CORE_PATTERN})\s*(?:{'|'.join(_BODY_DATE_LABELS_PRIMARY)})",
+    # "기사 날짜: 2026.05.18"
+    rf"기사\s*날짜\s*[:：]\s*({_DATE_CORE_PATTERN})",
+]
+
+_BODY_DATE_SECONDARY_PATTERNS = [
+    rf"(?:{'|'.join(_BODY_DATE_LABELS_SECONDARY)})\s*[:：]?\s*({_DATE_CORE_PATTERN})",
+    rf"({_DATE_CORE_PATTERN})\s*(?:{'|'.join(_BODY_DATE_LABELS_SECONDARY)})",
 ]
 
 
-def _extract_from_body_text(soup, url: str, max_chars: int = 3000) -> Optional[str]:
+def _clean_visible_text(soup) -> str:
+    """script/style/nav 등 불필요 영역을 제거하고 화면에 보이는 텍스트 중심으로 정리."""
+    soup_copy = soup
+    try:
+        # 원본 soup를 직접 훼손하지 않기 위해 copy가 가능하면 복제
+        import copy
+        soup_copy = copy.copy(soup)
+    except Exception:
+        soup_copy = soup
+
+    try:
+        for tag in soup_copy(["script", "style", "noscript", "iframe", "svg"]):
+            tag.decompose()
+    except Exception:
+        pass
+
+    text = soup_copy.get_text("\n", strip=True)
+    text = re.sub(r"[ \t\r\f\v]+", " ", text)
+    text = re.sub(r"\n{2,}", "\n", text)
+    return text.strip()
+
+
+def _find_date_in_text(text: str, patterns) -> Optional[str]:
+    """문자열에서 날짜 패턴을 찾고 YYYY-MM-DD로 정규화."""
+    if not text:
+        return None
+    for pattern in patterns:
+        for m in re.finditer(pattern, text, re.IGNORECASE):
+            raw = m.group(1)
+            dt = normalize_date(raw)
+            if dt:
+                return format_date(dt)
+    return None
+
+
+def _extract_from_body_text(soup, url: str, max_chars: int = 12000) -> Optional[str]:
     """
-    본문 텍스트에서 날짜 패턴 추출.
-    오탐 방지: 텍스트 앞쪽(기사 헤더 영역)만 탐색.
+    본문/화면 텍스트에서 발행일을 추출한다.
+
+    개선 기준:
+    1) 기사 상단·메타 영역의 "입력/등록/기사입력" 라벨 우선
+    2) 전체 visible text 앞부분에서 동일 라벨 재탐색
+    3) 수정일은 낮은 우선순위로만 사용
+    4) 라벨 없는 날짜 단독은 사건 날짜 오탐 가능성이 높아 사용하지 않음
     """
     try:
-        # 본문 전체 텍스트 대신 기사 헤더/메타 영역에서 우선 탐색
         candidate_texts = []
 
-        # 기사 헤더 영역 우선 탐색
+        # 국내 언론사에서 날짜가 들어가는 헤더/바이라인/메타 영역을 넓게 탐색
         header_selectors = [
-            ".article-head", ".article_head", ".article-header",
-            ".news_head", ".headline", ".article_info", ".article-info",
-            ".view_info", ".news_info", ".date_info", ".byline",
-            ".writer_info", ".article-date",
+            "header", "article header",
+            ".article-head", ".article_head", ".article-header", ".articleHeader",
+            ".news_head", ".news-head", ".headline", ".head_view", ".view_head",
+            ".article_info", ".article-info", ".articleInfo", ".info_area",
+            ".view_info", ".news_info", ".date_info", ".byline", ".byline_area",
+            ".writer_info", ".reporter_area", ".article-date", ".article_date",
+            ".date", ".time", ".meta", ".metadata", ".cont_info", ".viewTime",
+            "#article-view-content-div", "#articleBody", "#news_body_area",
         ]
         for sel in header_selectors:
-            tags = soup.select(sel)
-            for tag in tags:
-                text = tag.get_text(" ", strip=True)
-                if text:
-                    candidate_texts.append(text)
+            try:
+                for tag in soup.select(sel):
+                    text = tag.get_text(" ", strip=True)
+                    if text and len(text) >= 8:
+                        candidate_texts.append(text[:3000])
+            except Exception:
+                continue
 
-        # 헤더에서 못 찾으면 전체 텍스트 앞부분만 사용
-        if not candidate_texts:
-            full_text = soup.get_text(" ", strip=True)
-            candidate_texts = [full_text[:max_chars]]
+        visible_text = _clean_visible_text(soup)
+        if visible_text:
+            # 앞부분만 보지 않고 충분히 넓게 보되, 라벨 없는 날짜는 사용하지 않아 오탐을 줄임
+            candidate_texts.append(visible_text[:max_chars])
 
+            # "입력/등록/기사입력" 단어가 포함된 주변 문맥을 잘라 추가 탐색
+            for label in _BODY_DATE_LABELS_PRIMARY + _BODY_DATE_LABELS_SECONDARY:
+                for m in re.finditer(label, visible_text):
+                    start = max(0, m.start() - 120)
+                    end = min(len(visible_text), m.end() + 180)
+                    candidate_texts.append(visible_text[start:end])
+
+        # 1차: 최초 입력/등록 계열
         for text in candidate_texts:
-            for pattern in _BODY_DATE_PATTERNS:
-                m = re.search(pattern, text)
-                if m:
-                    dt = normalize_date(m.group(1))
-                    if dt:
-                        logger.info(f"[날짜추출] body_pattern 성공: {format_date(dt)} | {url}")
-                        return format_date(dt)
+            result = _find_date_in_text(text, _BODY_DATE_PATTERNS)
+            if result:
+                logger.info(f"[날짜추출] body_pattern(입력/등록) 성공: {result} | {url}")
+                return result
+
+        # 2차: 수정/업데이트 계열. 발행일이 전혀 없을 때만 사용
+        for text in candidate_texts:
+            result = _find_date_in_text(text, _BODY_DATE_SECONDARY_PATTERNS)
+            if result:
+                logger.info(f"[날짜추출] body_pattern(수정/업데이트) 성공: {result} | {url}")
+                return result
+
     except Exception as e:
         logger.debug(f"[날짜추출] body_pattern 오류 ({url}): {e}")
     return None

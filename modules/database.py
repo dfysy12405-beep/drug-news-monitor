@@ -56,7 +56,7 @@ def _to_df(data, columns=None):
 
 
 ARTICLE_COLUMNS = [
-    "id", "collected_date", "published_date", "source", "title", "url",
+    "id", "collected_date", "published_date", "date_source", "source", "title", "url",
     "summary", "keywords", "category", "importance", "education_point",
     "memo", "is_favorite"
 ]

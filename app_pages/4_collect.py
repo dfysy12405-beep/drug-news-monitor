@@ -109,7 +109,7 @@ with tab_rss:
                     ds = a.get("date_source", "")
                     if not a.get("published_date") or ds == "unknown":
                         unknown_date += 1
-                    elif ds == "rss_fallback":
+                    elif a.get("date_source") == "rss_fallback":
                         rss_date_used += 1
 
                     if success:
