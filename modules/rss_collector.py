@@ -43,39 +43,67 @@ GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid
 # -----------------------------------------------------------------
 
 def _decode_google_news_url(source_url: str) -> str:
-    """Google News RSS 링크를 실제 원문 URL로 변환. 실패 시 원본 반환."""
+    """Google News URL → 실제 원문 URL 변환. 실패 시 원본 반환."""
+    if "news.google.com" not in source_url:
+        return source_url
+
     try:
-        parsed = urlparse(source_url)
-        params = parse_qs(parsed.query)
-        if "url" in params:
-            return params["url"][0]
+        # 방법 1: requests로 리다이렉트 따라가기
+        if requests is not None:
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                )
+            }
+            resp = requests.get(
+                source_url, headers=headers,
+                timeout=5, allow_redirects=True
+            )
+            final_url = resp.url
+            if "news.google.com" not in final_url:
+                return final_url
 
-        if "news.google.com" in source_url and "/articles/" in source_url:
-            path = source_url.split("/articles/")[-1].split("?")[0]
-            try:
-                padding = 4 - len(path) % 4
-                if padding != 4:
-                    path += "=" * padding
-                decoded = base64.b64decode(path.replace("-", "+").replace("_", "/"))
-                url_match = re.search(rb"https?://[^\x00-\x1f\x7f-\xff\"<> ]+", decoded)
-                if url_match:
-                    return url_match.group(0).decode("utf-8")
-            except Exception:
-                pass
-
-        url_match = re.search(r"https?://(?!news\.google\.com)[^\s\"<>]+", source_url)
-        if url_match:
-            return url_match.group(0)
+            # 리다이렉트 후에도 Google이면 HTML에서 원문 URL 추출
+            if BeautifulSoup is not None:
+                soup = BeautifulSoup(resp.text, "html.parser")
+                # canonical 링크 확인
+                canonical = soup.find("link", rel="canonical")
+                if canonical and "news.google.com" not in canonical.get("href", ""):
+                    return canonical["href"]
+                # meta refresh 확인
+                meta = soup.find("meta", attrs={"http-equiv": "refresh"})
+                if meta:
+                    content = meta.get("content", "")
+                    m = re.search(r"url=(.+)", content, re.IGNORECASE)
+                    if m:
+                        return m.group(1).strip()
 
     except Exception as e:
         logger.debug(f"[URL디코딩] 실패 ({source_url}): {e}")
 
+    # 방법 2: base64 디코딩 시도 (구버전 호환)
+    try:
+        if "/articles/" in source_url:
+            path = source_url.split("/articles/")[-1].split("?")[0]
+            padding = 4 - len(path) % 4
+            if padding != 4:
+                path += "=" * padding
+            decoded = base64.b64decode(
+                path.replace("-", "+").replace("_", "/")
+            )
+            url_match = re.search(
+                rb"https?://[^\x00-\x1f\x7f-\xff\"<> ]+", decoded
+            )
+            if url_match:
+                candidate = url_match.group(0).decode("utf-8")
+                if "news.google.com" not in candidate:
+                    return candidate
+    except Exception:
+        pass
+
     return source_url
-
-
-# -----------------------------------------------------------------
-# RSS pubDate 파싱
-# -----------------------------------------------------------------
 
 def _parse_rss_date(entry) -> str:
     """feedparser entry에서 RSS pubDate를 YYYY-MM-DD로 파싱."""
