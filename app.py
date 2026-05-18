@@ -4,6 +4,7 @@
 ==============================================================
  - st.navigation 으로 사이드바 메뉴를 한글로 표시
  - 파일명은 영문 유지 (Windows 호환)
+ - app_pages 폴더 사용: Streamlit 기본 pages 자동탐색 충돌 방지
 ==============================================================
 """
 
@@ -27,12 +28,12 @@ st.set_page_config(
 )
 
 pg = st.navigation([
-    st.Page("pages/0_dashboard.py",   title="대시보드",   icon="📊", default=True),
-    st.Page("pages/1_articles.py",    title="전체기사",   icon="📰"),
-    st.Page("pages/2_keywords.py",    title="키워드관리", icon="🏷️"),
-    st.Page("pages/3_recommended.py", title="추천키워드", icon="💡"),
-    st.Page("pages/4_collect.py",     title="기사수집",   icon="📥"),
-    st.Page("pages/5_briefing.py",    title="주간브리핑", icon="📋"),
+    st.Page("app_pages/0_dashboard.py",   title="대시보드",   icon="📊", default=True),
+    st.Page("app_pages/1_articles.py",    title="전체기사",   icon="📰"),
+    st.Page("app_pages/2_keywords.py",    title="키워드관리", icon="🏷️"),
+    st.Page("app_pages/3_recommended.py", title="추천키워드", icon="💡"),
+    st.Page("app_pages/4_collect.py",     title="기사수집",   icon="📥"),
+    st.Page("app_pages/5_briefing.py",    title="주간브리핑", icon="📋"),
 ])
 
 pg.run()

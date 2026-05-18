@@ -169,6 +169,20 @@ def _extract_published_date_from_article(url: str) -> str:
             if date:
                 return date
 
+        # 국내 언론사 본문에 자주 노출되는 날짜 문구 보완
+        # 예: 입력 2026.05.18 14:20 / 승인 2026년 5월 18일 / 기사입력 2026-05-18
+        page_text = soup.get_text(" ", strip=True)
+        date_patterns = [
+            r"(?:입력|등록|승인|발행|기사입력|최초입력)\s*[:：]?\s*(20\d{2}[\.\-/년\s]+\d{1,2}[\.\-/월\s]+\d{1,2})",
+            r"(20\d{2}[\.\-/년\s]+\d{1,2}[\.\-/월\s]+\d{1,2})\s*(?:입력|등록|승인|발행)",
+        ]
+        for pattern in date_patterns:
+            m = re.search(pattern, page_text)
+            if m:
+                date = _normalize_date(m.group(1))
+                if date:
+                    return date
+
         # JSON-LD 기사 구조에서 datePublished/dateCreated 추출
         for script in soup.find_all("script", type="application/ld+json"):
             text = script.string or script.get_text(" ", strip=True)
@@ -227,13 +241,15 @@ def fetch_google_news(keyword: str, max_items: int = 10) -> list:
         real_url = _decode_google_news_url(entry.link)
         real_published_date = _extract_published_date_from_article(real_url)
 
+        # 원문 발행일이 확인되면 우선 사용하고, 실패한 경우 Google News RSS 날짜를 보조값으로 사용한다.
+        # RSS 날짜는 원문 발행일과 다를 수 있으므로, 대시보드 판단 시 원문 확인이 필요한 보조값이다.
+        published_date = real_published_date or rss_date
+
         results.append({
             "title": title.strip(),
             "url": real_url,
             "source": source.strip() or "Google News",
-            # 실제 원문 발행일을 확인한 경우에만 저장한다.
-            # 확인 실패 시 빈 값으로 두어 옛날 기사가 오늘 기사로 분류되지 않게 한다.
-            "published_date": real_published_date,
+            "published_date": published_date,
             "rss_date": rss_date,
             "summary": summary[:500],
         })
