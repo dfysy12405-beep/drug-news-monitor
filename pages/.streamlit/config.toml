@@ -1,0 +1,14 @@
+# 공공기관 내부 업무용 느낌의 깔끔한 테마
+[theme]
+primaryColor = "#2563eb"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8fafc"
+textColor = "#0f172a"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+# 브라우저 탭 제목 및 홈 화면 추가 시 앱 이름
+serverName = "마약류 언론동향 모니터링"
