@@ -11,3 +11,6 @@ dateparser>=1.1.8
 # HTML 파싱 인코딩 감지 (EUC-KR 언론사 대응)
 chardet>=5.0.0
 lxml>=4.9.0
+
+# Google News RSS URL 디코딩 보강
+googlenewsdecoder>=0.1.7

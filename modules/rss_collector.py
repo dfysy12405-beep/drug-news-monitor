@@ -35,6 +35,12 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+try:
+    from googlenewsdecoder import gnewsdecoder
+except Exception:
+    gnewsdecoder = None
+
+
 GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
 
 
@@ -43,47 +49,99 @@ GOOGLE_NEWS_RSS = "https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid
 # -----------------------------------------------------------------
 
 def _decode_google_news_url(source_url: str) -> str:
-    """Google News URL → 실제 원문 URL 변환. 실패 시 원본 반환."""
-    if "news.google.com" not in source_url:
+    """Google News URL → 실제 원문 URL 변환. 실패 시 원본 반환.
+
+    우선순위:
+    1) googlenewsdecoder 패키지 사용
+    2) URL 쿼리 파라미터(url/q/u) 직접 추출
+    3) requests 리다이렉트 추적
+    4) Google News HTML 내 원문 URL 탐색
+    5) 구버전 base64 디코딩
+    """
+    if not source_url or "news.google.com" not in source_url:
         return source_url
 
+    # 1) googlenewsdecoder 패키지 사용: 최근 Google News 인코딩 대응
     try:
-        # 방법 1: requests로 리다이렉트 따라가기
+        if gnewsdecoder is not None:
+            decoded = gnewsdecoder(source_url)
+            if isinstance(decoded, dict):
+                candidate = decoded.get("decoded_url") or decoded.get("url") or ""
+                if decoded.get("status") and candidate and "news.google.com" not in candidate:
+                    return candidate
+            elif isinstance(decoded, str) and decoded and "news.google.com" not in decoded:
+                return decoded
+    except Exception as e:
+        logger.debug(f"[URL디코딩] googlenewsdecoder 실패 ({source_url}): {e}")
+
+    # 2) 간혹 URL 파라미터에 원문이 직접 들어있는 경우
+    try:
+        parsed = urlparse(source_url)
+        qs = parse_qs(parsed.query)
+        for key in ("url", "q", "u"):
+            val = (qs.get(key) or [""])[0]
+            if val.startswith("http") and "news.google.com" not in val:
+                return val
+    except Exception:
+        pass
+
+    try:
+        # 3) requests로 리다이렉트 따라가기
         if requests is not None:
             headers = {
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/124.0.0.0 Safari/537.36"
-                )
+                ),
+                "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8",
             }
             resp = requests.get(
-                source_url, headers=headers,
-                timeout=5, allow_redirects=True
+                source_url,
+                headers=headers,
+                timeout=8,
+                allow_redirects=True,
             )
             final_url = resp.url
-            if "news.google.com" not in final_url:
+            if final_url and "news.google.com" not in final_url:
                 return final_url
 
-            # 리다이렉트 후에도 Google이면 HTML에서 원문 URL 추출
+            # 4) 리다이렉트 후에도 Google이면 HTML에서 원문 URL 후보 추출
+            html = resp.text or ""
             if BeautifulSoup is not None:
-                soup = BeautifulSoup(resp.text, "html.parser")
-                # canonical 링크 확인
+                soup = BeautifulSoup(html, "html.parser")
+
                 canonical = soup.find("link", rel="canonical")
-                if canonical and "news.google.com" not in canonical.get("href", ""):
-                    return canonical["href"]
-                # meta refresh 확인
-                meta = soup.find("meta", attrs={"http-equiv": "refresh"})
+                if canonical and canonical.get("href"):
+                    href = canonical.get("href")
+                    if "news.google.com" not in href:
+                        return href
+
+                meta = soup.find("meta", attrs={"http-equiv": re.compile("refresh", re.I)})
                 if meta:
                     content = meta.get("content", "")
                     m = re.search(r"url=(.+)", content, re.IGNORECASE)
                     if m:
-                        return m.group(1).strip()
+                        candidate = m.group(1).strip().strip('"\'')
+                        if candidate.startswith("http") and "news.google.com" not in candidate:
+                            return candidate
+
+                # Google News 중간 페이지에서 원문 링크가 a[href]로 노출되는 경우
+                for a in soup.find_all("a", href=True):
+                    href = a.get("href", "")
+                    if href.startswith("http") and "news.google.com" not in href and "google.com" not in href:
+                        return href
+
+            # HTML raw text 내 원문 URL 후보 탐색
+            for m in re.finditer(r"https?://[^\"'<>\\\s]+", html):
+                candidate = m.group(0)
+                if "news.google.com" not in candidate and "google.com" not in candidate:
+                    return candidate
 
     except Exception as e:
-        logger.debug(f"[URL디코딩] 실패 ({source_url}): {e}")
+        logger.debug(f"[URL디코딩] requests/HTML 방식 실패 ({source_url}): {e}")
 
-    # 방법 2: base64 디코딩 시도 (구버전 호환)
+    # 5) base64 디코딩 시도 (구버전 호환)
     try:
         if "/articles/" in source_url:
             path = source_url.split("/articles/")[-1].split("?")[0]
@@ -97,7 +155,7 @@ def _decode_google_news_url(source_url: str) -> str:
                 rb"https?://[^\x00-\x1f\x7f-\xff\"<> ]+", decoded
             )
             if url_match:
-                candidate = url_match.group(0).decode("utf-8")
+                candidate = url_match.group(0).decode("utf-8", errors="ignore")
                 if "news.google.com" not in candidate:
                     return candidate
     except Exception:
