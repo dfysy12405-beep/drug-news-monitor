@@ -359,3 +359,34 @@ OpenAI API 사용 시 API 비용은 사용자 부담입니다.
 - Start Command: `streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true`
 - Environment: Python
 
+
+## Supabase 전환 적용 안내
+
+이 수정본은 기존 SQLite(`data/monitor.db`) 저장 방식을 Supabase 저장 방식으로 변경한 버전입니다.
+
+### 1. Supabase에서 테이블 생성
+Supabase 프로젝트 → SQL Editor → New query에서 `supabase_setup.sql` 내용을 붙여넣고 실행합니다.  
+보안 팝업이 뜨면 현재 내부용 앱 기준으로 `Run without RLS`를 선택합니다.
+
+### 2. Streamlit Cloud Secrets 등록
+Streamlit Cloud → 해당 앱 → Manage app → Settings → Secrets에 아래 형식으로 입력합니다.
+
+```toml
+SUPABASE_URL = "https://프로젝트주소.supabase.co"
+SUPABASE_KEY = "anon public key"
+```
+
+기존 OpenAI 키를 쓰고 있다면 함께 유지합니다.
+
+```toml
+OPENAI_API_KEY = "sk-..."
+SUPABASE_URL = "https://프로젝트주소.supabase.co"
+SUPABASE_KEY = "anon public key"
+```
+
+### 3. GitHub 업로드
+수정된 전체 파일을 GitHub에 업로드하면 Streamlit Cloud가 자동 재배포합니다.
+
+### 4. 주의
+기존 `data/monitor.db`에 있던 과거 기사/키워드는 자동 이전되지 않습니다.  
+필요하면 기존 DB를 CSV로 뽑아 Supabase에 별도 업로드해야 합니다.
