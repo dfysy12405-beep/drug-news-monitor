@@ -411,11 +411,15 @@ def extract_published_date(
     if result:
         return result, "body_pattern"
 
-    # ── Step 6: HTTP 헤더 Last-Modified ──
-    if response is not None:
-        result = _extract_from_http_header(response, url)
-        if result:
-            return result, "http_header"
+# ── Step 6: HTTP 헤더 Last-Modified ──
+# HTTP header Date/Last-Modified는 실제 기사 발행일이 아니라
+# 서버 응답 시각 또는 페이지 갱신 시각일 수 있으므로
+# 발행일 추출에는 사용하지 않음
+#
+# if response is not None:
+#     result = _extract_from_http_header(response, url)
+#     if result:
+#         return result, "http_header"
 
     # ── Step 7: RSS pubDate 최후 fallback ──
     return _rss_fallback(rss_date, url)
